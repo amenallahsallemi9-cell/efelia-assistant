@@ -187,6 +187,16 @@ def _controles_certificat(
 
 
 def _controle_lettre(lettre: DonneesLettre, reglement: Reglement) -> Controle:
+    attendus = ", ".join(reglement.lettre_themes)
+    if not lettre.themes:
+        return _controle(
+            "lettre_themes",
+            f"Lettre de motivation : {attendus}",
+            Resultat.INDETERMINE,
+            "Thèmes de la lettre non déterminés : relecture humaine conseillée.",
+            reglement,
+            (Preuve(source="document", page=lettre.page),),
+        )
     manquants = [
         t
         for t in reglement.lettre_themes
@@ -197,7 +207,6 @@ def _controle_lettre(lettre: DonneesLettre, reglement: Reglement) -> Controle:
         for nom, theme in lettre.themes.items()
         if theme.present and nom in reglement.lettre_themes
     ) or (Preuve(source="document", page=lettre.page),)
-    attendus = ", ".join(reglement.lettre_themes)
     if not manquants:
         resultat, message = Resultat.CONFORME, f"La lettre aborde bien : {attendus}."
     else:

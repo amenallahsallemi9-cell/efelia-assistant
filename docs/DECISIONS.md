@@ -97,3 +97,48 @@ PyMuPDF, l'absence de mot de passe et le nombre de pages. Le fichier est stocké
 nom aléatoire (UUID), avec les droits `0600`, et écrit de façon atomique. Le nom
 d'origine, réduit à son nom de base (sans chemin), n'est conservé que pour le contrôle
 de format.
+
+## D10 — Les fournisseurs passent par des interfaces abstraites, avec un FakeProvider réaliste
+
+`providers/base.py` définit `LLMProvider`, `EmbeddingProvider` et `Reranker` avec des types
+neutres (`Message`, `Outil`, `ReponseLLM`). Cohere n'apparaît que dans
+`providers/cohere.py`. Le `FakeLLM` a trois modes :
+- il rejoue un scénario (tests de l'agent) ;
+- il appelle une fonction de réponse personnalisée ;
+- par défaut, il répond aux tâches structurées avec les **mêmes heuristiques** que le
+  secours (`services/heuristiques.py`).
+
+Les embeddings factices projettent les mots sur 1024 dimensions par hachage : deux
+textes au vocabulaire commun sont proches.
+
+**Pourquoi :** le mode démo produit un vrai résultat sans clé, les tests sont
+déterministes et hors ligne, et l'adaptateur Cohere est testé contre un client simulé.
+**Limite :** les appels réels à Cohere ne sont pas exécutés en CI. Il faut une clé pour
+les valider à la main.
+
+## D11 — Les extraits cités par le LLM sont vérifiés
+
+Chaque champ `extrait` renvoyé par le LLM est recherché dans le texte réel des pages,
+après normalisation. S'il est introuvable, il est retiré et la confiance tombe à
+« moyenne ». Sinon, on lui associe le numéro de page qui sert de preuve.
+
+**Pourquoi :** une preuve affichée dans l'interface doit exister dans le document.
+Un LLM peut paraphraser ou inventer une citation.
+
+## D12 — Lecture : une relance, puis secours heuristique, et une confiance faible n'établit rien
+
+Si la sortie JSON est invalide, on relance une fois en joignant l'erreur. Au second
+échec, on se rabat sur l'heuristique avec `confiance = faible`. Les données d'une pièce
+lue en confiance faible ne produisent **aucune non-conformité** : ses contrôles de
+cohérence deviennent « indéterminés » (voir D5).
+
+## D13 — La signature de l'attestation est déduite d'indices, pas du LLM
+
+Le LLM ne voit que le texte et ne peut donc pas voir une signature. La décision se
+prend dans cet ordre :
+1. une mention de signature électronique suffit ;
+2. sinon, la présence d'un tracé ou d'une image **sous** la mention « Signature » ou
+   « Fait à » compte comme une signature ;
+3. sans aucune marque visuelle ni mention, l'attestation est jugée non signée ;
+4. dans les cas ambigus, comme une page scannée ou une mention sans marque, le contrôle
+   reste indéterminé.

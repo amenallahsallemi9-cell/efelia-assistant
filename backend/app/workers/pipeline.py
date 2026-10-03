@@ -19,12 +19,15 @@ from sqlalchemy.orm import Session
 from app.core.config import Parametres
 from app.db.modeles import Dossier
 from app.domain.modeles import StatutPipeline
+from app.providers import Fournisseurs, construire_fournisseurs
+from app.services.classification import executer_classification
 from app.services.extraction import (
     ErreurExtraction,
     FonctionOcr,
     executer_extraction,
     ocr_tesseract,
 )
+from app.services.lecture import executer_lecture
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +73,7 @@ class Contexte:
     session: Session
     dossier: Dossier
     parametres: Parametres
+    fournisseurs: Fournisseurs
     ocr: FonctionOcr = ocr_tesseract
     donnees: dict[str, Any] = field(default_factory=dict)
 
@@ -85,9 +89,21 @@ def etape_extraction(contexte: Contexte) -> None:
         raise ErreurEtape(str(exc)) from exc
 
 
+def etape_classification(contexte: Contexte) -> None:
+    """Type de chaque page et regroupement en pièces."""
+    executer_classification(contexte.session, contexte.dossier, contexte.fournisseurs.llm)
+
+
+def etape_lecture(contexte: Contexte) -> None:
+    """Extraction structurée par pièce."""
+    executer_lecture(contexte.session, contexte.dossier, contexte.fournisseurs.llm)
+
+
 #: Étapes du pipeline, complétées au fil des phases (classification, lecture…).
 ETAPES: list[tuple[StatutPipeline, str, Etape]] = [
     (StatutPipeline.EXTRAIT, "extraction", etape_extraction),
+    (StatutPipeline.CLASSE, "classification", etape_classification),
+    (StatutPipeline.LU, "lecture", etape_lecture),
 ]
 
 
@@ -107,12 +123,19 @@ def executer_pipeline(
     publieur: Publieur,
     etapes: Sequence[tuple[StatutPipeline, str, Etape]] = ETAPES,
     ocr: FonctionOcr = ocr_tesseract,
+    fournisseurs: Fournisseurs | None = None,
 ) -> StatutPipeline:
     """Exécute les étapes dans l'ordre ; s'arrête à la première erreur."""
     dossier = session.get(Dossier, dossier_id)
     if dossier is None:
         raise LookupError(f"Dossier {dossier_id} introuvable.")
-    contexte = Contexte(session=session, dossier=dossier, parametres=parametres, ocr=ocr)
+    contexte = Contexte(
+        session=session,
+        dossier=dossier,
+        parametres=parametres,
+        fournisseurs=fournisseurs or construire_fournisseurs(parametres),
+        ocr=ocr,
+    )
     dossier.message_erreur = None
 
     for statut, nom, etape in etapes:

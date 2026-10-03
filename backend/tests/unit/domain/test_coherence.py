@@ -157,9 +157,17 @@ def test_lettre_incomplete_simple_avertissement(fiche: Fiche, reglement: Regleme
     assert controle.preuves[0].extrait == "mon master"
 
 
-def test_lettre_sans_aucun_theme_cite_la_page(fiche: Fiche, reglement: Reglement) -> None:
+def test_lettre_non_lue_indeterminee(fiche: Fiche, reglement: Reglement) -> None:
     lettre = DonneesLettre(themes={}, page=8)
     controle = _controle(fiche, FaitsCoherence(lettre=lettre), reglement, "lettre_themes")
+    assert controle.resultat is Resultat.INDETERMINE
+    assert controle.preuves[0].page == 8
+
+
+def test_lettre_sans_theme_present_cite_la_page(fiche: Fiche, reglement: Reglement) -> None:
+    lettre = DonneesLettre(themes={"formation": ThemeLettre(False)}, page=8)
+    controle = _controle(fiche, FaitsCoherence(lettre=lettre), reglement, "lettre_themes")
+    assert controle.resultat is Resultat.NON_CONFORME
     assert controle.preuves[0].page == 8
 
 

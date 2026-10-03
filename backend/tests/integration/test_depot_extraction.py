@@ -16,7 +16,7 @@ from app.domain.modeles import MethodeExtraction, StatutPipeline, TypePiece
 from app.domain.regles import Reglement
 from app.schemas import FicheDeclaree
 from app.services.depot import ErreurDepot, creer_dossier
-from app.workers.pipeline import Contexte, ErreurEtape, executer_pipeline
+from app.workers.pipeline import ETAPES, Contexte, ErreurEtape, executer_pipeline
 
 CANDIDAT = Candidat("Dupont", "Hélène")
 MAINTENANT = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
@@ -111,7 +111,9 @@ def test_pipeline_extraction(
         reglement,
     )
     publieur = PublieurMemoire()
-    statut = executer_pipeline(session_test, dossier.id, parametres_test, publieur, ocr=_sans_ocr)
+    statut = executer_pipeline(
+        session_test, dossier.id, parametres_test, publieur, etapes=ETAPES[:1], ocr=_sans_ocr
+    )
     assert statut is StatutPipeline.EXTRAIT
 
     pages = session_test.scalars(
