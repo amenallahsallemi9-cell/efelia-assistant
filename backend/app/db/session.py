@@ -16,11 +16,12 @@ def get_moteur() -> Engine:
 
 
 @lru_cache
-def _fabrique() -> sessionmaker[Session]:
+def fabrique_sessions() -> sessionmaker[Session]:
+    """Fabrique de sessions (worker, scripts)."""
     return sessionmaker(bind=get_moteur(), expire_on_commit=False)
 
 
 def get_session() -> Iterator[Session]:
     """Dépendance FastAPI : ouvre une session et la ferme après la requête."""
-    with _fabrique()() as session:
+    with fabrique_sessions()() as session:
         yield session

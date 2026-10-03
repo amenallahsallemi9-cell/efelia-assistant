@@ -5,8 +5,7 @@ from rq import Queue, Worker
 
 from app.core.config import get_parametres
 from app.core.logs import configurer_logs
-
-NOM_FILE = "dossiers"
+from app.workers.file import NOM_FILE
 
 
 def main() -> None:

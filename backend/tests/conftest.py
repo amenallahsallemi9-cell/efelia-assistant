@@ -87,3 +87,11 @@ def client(session_test: Session, parametres_test: Parametres) -> Iterator[TestC
     with TestClient(app) as client_http:
         yield client_http
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(scope="session")
+def reglement():  # type: ignore[no-untyped-def]
+    """Règlement 2026 réel (config/regles_2026.yaml)."""
+    from app.core.reglement import charger_reglement
+
+    return charger_reglement(RACINE_BACKEND.parent / "config" / "regles_2026.yaml")
