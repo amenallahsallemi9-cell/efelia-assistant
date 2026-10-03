@@ -182,3 +182,39 @@ d'échelles différentes.
 La colonne `modele_embedding` sert à filtrer toutes les recherches. Si l'on passe du
 mode démo à Cohere, les anciens vecteurs, qui ne sont pas comparables, sont ignorés. Le
 règlement est réindexé automatiquement quand son texte ou le modèle change.
+
+## D17 — Le garde-fou de l'agent, en détail
+
+L'agent LLM **ne décide jamais seul**. Il dispose de 9 outils et propose un statut via
+`enregistrer_decision`. Ensuite :
+1. le statut final est **toujours** recalculé par `domain/` (`instruire_par_regles`) ;
+2. si la proposition diffère, `garde_fou_declenche = true` et le rapport l'affiche ;
+3. l'outil renvoie au LLM le statut retenu, pour que son rapport reste cohérent ;
+4. l'en-tête du rapport (verdict, motifs et preuves, points de vigilance, pièces à
+   fournir) est **généré par le code**. Le texte du LLM n'apparaît que dans les sections
+   « Conseils » et « Analyse de l'agent ».
+
+D'autres protections viennent s'ajouter au garde-fou :
+- **Accès** : un outil ne peut agir que sur le dossier en cours (`dossier_id` vérifié).
+- **Minimisation** : l'adresse e-mail n'est jamais transmise au LLM.
+- **Erreurs** : un outil inconnu, un JSON invalide ou un argument hors schéma devient
+  `{"erreur": …}` renvoyé au LLM, qui peut se corriger. La boucle ne plante jamais.
+- **Injection de prompt** : elle est détectée de façon déterministe et signalée dans
+  `lire_fiche` et dans les avertissements de la décision, même si le LLM l'ignore.
+- **Prédiction** : toute phrase qui estime les chances (« chances », « probabilité »,
+  « %», « vous serez retenu·e »…) est retirée du texte du LLM et le retrait est signalé.
+  On accepte quelques retraits en trop plutôt que de laisser passer une prédiction.
+- **Résilience** : si le fournisseur est en panne, ou si l'agent n'a pas conclu au bout
+  de 12 tours, une décision est quand même enregistrée à partir des règles, avec une
+  note explicative.
+- **Audit** : chaque tour de LLM (plan, jetons) et chaque appel d'outil (arguments,
+  résultat, durée) est écrit dans `traces_agent`. Toutes les décisions successives sont
+  conservées.
+
+## D18 — Un agent scripté pour le mode démo
+
+Sans clé, `FakeLLM` joue un agent scripté (`services/agent/demo.py`). Il suit la même
+procédure, avec plusieurs appels d'outils par tour, déduit sa proposition des résultats
+des outils et rédige un rapport à partir des données lues. Toute la chaîne (outils,
+traces, garde-fou, rapport) fonctionne donc hors ligne, et le rapport indique
+clairement qu'il a été produit en mode démo.

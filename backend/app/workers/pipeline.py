@@ -17,9 +17,12 @@ from typing import Any, Protocol
 from sqlalchemy.orm import Session
 
 from app.core.config import Parametres
+from app.core.reglement import get_reglement
 from app.db.modeles import Dossier
 from app.domain.modeles import StatutPipeline
+from app.domain.regles import Reglement
 from app.providers import Fournisseurs, construire_fournisseurs
+from app.services.agent.boucle import instruire_avec_agent
 from app.services.classification import executer_classification
 from app.services.extraction import (
     ErreurExtraction,
@@ -75,6 +78,7 @@ class Contexte:
     dossier: Dossier
     parametres: Parametres
     fournisseurs: Fournisseurs
+    reglement: Reglement
     ocr: FonctionOcr = ocr_tesseract
     donnees: dict[str, Any] = field(default_factory=dict)
 
@@ -107,12 +111,20 @@ def etape_indexation(contexte: Contexte) -> None:
     indexer_dossier(contexte.session, contexte.dossier, embeddings)
 
 
+def etape_instruction(contexte: Contexte) -> None:
+    """Instruction par l'agent ; le statut final est celui des règles."""
+    instruire_avec_agent(
+        contexte.session, contexte.dossier, contexte.reglement, contexte.fournisseurs
+    )
+
+
 #: Étapes du pipeline, complétées au fil des phases (classification, lecture…).
 ETAPES: list[tuple[StatutPipeline, str, Etape]] = [
     (StatutPipeline.EXTRAIT, "extraction", etape_extraction),
     (StatutPipeline.CLASSE, "classification", etape_classification),
     (StatutPipeline.LU, "lecture", etape_lecture),
     (StatutPipeline.INDEXE, "indexation", etape_indexation),
+    (StatutPipeline.INSTRUIT, "instruction", etape_instruction),
 ]
 
 
@@ -133,6 +145,7 @@ def executer_pipeline(
     etapes: Sequence[tuple[StatutPipeline, str, Etape]] = ETAPES,
     ocr: FonctionOcr = ocr_tesseract,
     fournisseurs: Fournisseurs | None = None,
+    reglement: Reglement | None = None,
 ) -> StatutPipeline:
     """Exécute les étapes dans l'ordre ; s'arrête à la première erreur."""
     dossier = session.get(Dossier, dossier_id)
@@ -143,6 +156,7 @@ def executer_pipeline(
         dossier=dossier,
         parametres=parametres,
         fournisseurs=fournisseurs or construire_fournisseurs(parametres),
+        reglement=reglement or get_reglement(),
         ocr=ocr,
     )
     dossier.message_erreur = None

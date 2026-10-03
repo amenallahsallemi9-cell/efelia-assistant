@@ -37,6 +37,8 @@ jobs:
       REDIS_URL: redis://localhost:6379/0
       LLM_PROVIDER: fake
       COHERE_API_KEY: ""
+      REGLES_FICHIER: ${{ github.workspace }}/config/regles_2026.yaml
+      REGLEMENT_TEXTE: ${{ github.workspace }}/config/reglement_2026.md
     steps:
       - uses: actions/checkout@v4
       - name: Tesseract (OCR français)

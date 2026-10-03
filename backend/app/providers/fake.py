@@ -2,7 +2,8 @@
 
 - `FakeLLM` rejoue un scénario de réponses prédéfinies (tests de l'agent) ; sans
   scénario, il répond aux tâches structurées (classement, lecture) avec les
-  heuristiques de `services/heuristiques.py`, ce qui rend le mode démo réaliste.
+  heuristiques de `services/heuristiques.py` et, avec des outils, joue un agent
+  scripté (`services/agent/demo.py`) : le mode démo est réaliste de bout en bout.
 - `FakeEmbeddings` projette les mots sur 1024 dimensions par hachage : deux textes
   qui partagent du vocabulaire sont proches, sans aucun modèle.
 - `FakeReranker` classe par recouvrement de vocabulaire.
@@ -70,6 +71,10 @@ class FakeLLM(LLMProvider):
             return self._repondeur(messages, outils, format_json)
         if format_json is not None:
             return ReponseLLM(texte=json.dumps(_repondre_tache(format_json.nom, messages)))
+        if outils:
+            from app.services.agent.demo import repondre_agent_demo
+
+            return repondre_agent_demo(messages)
         return ReponseLLM(texte="Réponse simulée (mode démo).")
 
 

@@ -169,6 +169,7 @@ class Decision(Base):
     statut_regles: Mapped[Verdict] = mapped_column(_enum(Verdict, "verdict"))
     statut_propose_llm: Mapped[Verdict | None] = mapped_column(_enum(Verdict, "verdict"))
     garde_fou_declenche: Mapped[bool] = mapped_column(Boolean, default=False)
+    controles: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     motifs: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     avertissements: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     conseils: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
