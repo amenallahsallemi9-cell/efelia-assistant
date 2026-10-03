@@ -218,3 +218,32 @@ procédure, avec plusieurs appels d'outils par tour, déduit sa proposition des 
 des outils et rédige un rapport à partir des données lues. Toute la chaîne (outils,
 traces, garde-fou, rapport) fonctionne donc hors ligne, et le rapport indique
 clairement qu'il a été produit en mode démo.
+
+## D19 — Choix de l'API REST
+
+- **Dépôt asynchrone** : `POST /api/dossiers` valide, stocke, puis répond **202** avec
+  l'identifiant. Le pipeline tourne dans le worker. Le consentement au traitement des
+  données est obligatoire (`CONSENTEMENT_REQUIS`), et le fichier est lu dans la limite
+  de taille + 1 octet.
+- **Temps réel (SSE)** : l'API s'abonne au canal Redis **avant** de lire l'état en base,
+  pour ne manquer aucun événement entre les deux. Le flux s'arrête à INSTRUIT ou ERREUR,
+  envoie un ping toutes les 15 s et dure au plus 15 minutes. nginx ne met pas la réponse
+  en tampon (`proxy_buffering off`).
+- **Pas de texte brut exposé** : l'API ne renvoie jamais le texte des pages, seulement les
+  données structurées et les extraits servant de preuves.
+- **Visionneuse** : l'aperçu PNG surligne l'extrait demandé, grâce à la couche texte du
+  PDF. Les **pages sensibles sont toujours pixelisées** : l'outil d'instruction n'a pas à
+  afficher un avis d'imposition ou un certificat médical, dont seul le type compte.
+  Limite : une page scannée (OCR) ne peut pas être surlignée.
+- **Relance** : `POST …/instruire` ne rejoue que l'agent si le dossier est déjà indexé,
+  sinon tout le pipeline. Elle est refusée (409) pendant un traitement. L'historique des
+  décisions est conservé.
+- **Effacement** : `DELETE` supprime le dossier en base (la cascade efface les pages,
+  pièces, embeddings, décisions et traces) puis le fichier. On vérifie d'abord que le
+  chemin est bien dans le volume de stockage.
+- **Endpoints ajoutés au cahier des charges** : `GET /api/dossiers/statistiques`
+  (compteurs du tableau de bord) et `GET /api/reglement` (date limite pour le compte à
+  rebours, pièces, nom de fichier attendu).
+- **Erreurs** : toujours `{"erreur": {code, message, details}}` en français, avec des
+  codes stables (`DOSSIER_INTROUVABLE`, `TYPE_NON_PDF`, `FICHE_INVALIDE`,
+  `TRAITEMENT_EN_COURS`…).

@@ -16,10 +16,12 @@ def file_dossiers() -> Queue:
     return Queue(NOM_FILE, connection=Redis.from_url(get_parametres().redis_url))
 
 
-def mettre_en_file(dossier_id: uuid.UUID) -> str:
-    """Planifie le pipeline complet d'un dossier ; retourne l'identifiant de la tâche."""
+def mettre_en_file(
+    dossier_id: uuid.UUID, fonction: str = "app.workers.pipeline.traiter_dossier"
+) -> str:
+    """Planifie un traitement du dossier ; retourne l'identifiant de la tâche."""
     tache = file_dossiers().enqueue(
-        "app.workers.pipeline.traiter_dossier",
+        fonction,
         str(dossier_id),
         job_timeout=DELAI_MAX_SECONDES,
         result_ttl=3600,

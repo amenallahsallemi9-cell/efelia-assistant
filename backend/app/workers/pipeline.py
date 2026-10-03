@@ -198,8 +198,9 @@ def executer_pipeline(
     return dossier.statut_pipeline
 
 
-def traiter_dossier(dossier_id: str) -> str:
-    """Point d'entrée de la tâche RQ."""
+def _executer_tache(
+    dossier_id: str, etapes: Sequence[tuple[StatutPipeline, str, Etape]] | None
+) -> str:
     from redis import Redis
 
     from app.core.config import get_parametres
@@ -208,4 +209,36 @@ def traiter_dossier(dossier_id: str) -> str:
     parametres = get_parametres()
     publieur = PublieurRedis(Redis.from_url(parametres.redis_url))
     with fabrique_sessions()() as session:
-        return executer_pipeline(session, uuid.UUID(dossier_id), parametres, publieur).value
+        try:
+            statut = executer_pipeline(
+                session, uuid.UUID(dossier_id), parametres, publieur, etapes=etapes or ETAPES
+            )
+        except LookupError:
+            # Dossier supprimé entre la mise en file et l'exécution : rien à faire.
+            logger.info("Dossier supprimé avant traitement", extra={"dossier_id": dossier_id})
+            return "SUPPRIME"
+        return statut.value
+
+
+def traiter_dossier(dossier_id: str) -> str:
+    """Tâche RQ : pipeline complet."""
+    return _executer_tache(dossier_id, None)
+
+
+def etapes_de_relance(statut: StatutPipeline) -> Sequence[tuple[StatutPipeline, str, Etape]]:
+    """Seule l'instruction est rejouée si le dossier est déjà indexé ; sinon tout le pipeline."""
+    if statut in (StatutPipeline.INDEXE, StatutPipeline.INSTRUIT):
+        return ETAPES[-1:]
+    return ETAPES
+
+
+def relancer_instruction(dossier_id: str) -> str:
+    """Tâche RQ : nouvelle instruction du dossier."""
+    from app.db.session import fabrique_sessions
+
+    with fabrique_sessions()() as session:
+        dossier = session.get(Dossier, uuid.UUID(dossier_id))
+        if dossier is None:
+            return "SUPPRIME"
+        etapes = etapes_de_relance(dossier.statut_pipeline)
+    return _executer_tache(dossier_id, etapes)

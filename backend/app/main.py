@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api.erreurs import installer_gestionnaires
-from app.api.routes import sante
+from app.api.routes import dossiers, eligibilite, sante
 from app.core.config import get_parametres
 from app.core.logs import configurer_logs
 
@@ -39,7 +39,8 @@ def creer_app() -> FastAPI:
         allow_headers=["*"],
     )
     installer_gestionnaires(app)
-    app.include_router(sante.routeur, prefix="/api")
+    for routeur in (sante.routeur, eligibilite.routeur, dossiers.routeur):
+        app.include_router(routeur, prefix="/api")
     return app
 
 
