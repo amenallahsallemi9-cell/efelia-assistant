@@ -1,7 +1,12 @@
 # Décisions d'architecture et d'interprétation
 
-Ce document trace les choix structurants du projet et leurs raisons. Il est complété à
-chaque phase.
+Ce document trace les choix structurants du projet et leurs raisons, phase par phase.
+
+**Les trois décisions centrales** :
+- pourquoi un garde-fou → [D1](#d1--le-statut-est-calculé-par-des-règles-pures-jamais-par-le-llm-garde-fou)
+  et [D17](#d17--le-garde-fou-de-lagent-en-détail) ;
+- pourquoi pgvector → [D14](#d14--pgvector-plutôt-quune-base-vectorielle-dédiée) ;
+- pourquoi un worker → [D8](#d8--un-worker-séparé-rq--redis-pour-le-pipeline).
 
 ## D1 — Le statut est calculé par des règles pures, jamais par le LLM (garde-fou)
 
@@ -29,19 +34,24 @@ démarrer.
 
 **Pourquoi :** l'édition 2027 se prépare en copiant le fichier, sans toucher au code.
 
-## D4 — Interprétations du règlement (validées par le porteur du projet)
+## D4 — Interprétations du règlement
 
-| Point ambigu | Interprétation retenue |
-|---|---|
-| « 18 octobre 2026 à minuit » | Fin de la journée du 18 : reçu **avant** le 19/10/2026 00:00:00, heure de Paris (borne exclusive). |
-| Date de réception | Champ de la fiche (date d'envoi de l'email). À défaut, l'horodatage du dépôt. |
-| Nom de fichier non conforme | **Avertissement** seulement, sans effet sur le statut. |
-| CV de plus de 2 pages, attestation non signée, certificat d'une autre année | A_COMPLETER |
-| Lettre qui n'aborde pas les 3 thèmes | Avertissement (c'est une appréciation du LLM). |
-| Certificat au mauvais nom ou d'un autre établissement | A_COMPLETER (pièce à fournir de nouveau). L'éligibilité se juge sur la fiche. |
-| « Autre bourse d'études » | Toute bourse autre que la bourse CROUS sur critères sociaux rend le dossier NON_RECEVABLE. Le message invite à vérifier auprès d'EFELIA s'il s'agit d'une aide ponctuelle ou de mobilité. |
-| 24 h d'IA | Sur déclaration (`heures_ia ≥ 24`, 24 incluses). Le certificat ne les mentionne pas. |
-| Relevés de notes | Avertissement si l'année lue diffère de 2025-2026. |
+Les ambiguïtés du règlement ont été soumises au porteur du projet avant de coder. Il en a
+**confirmé explicitement** deux (✔). Les autres sont les choix par défaut proposés, qu'il
+n'a pas contestés : ils restent modifiables dans `config/regles_2026.yaml` (colonne
+« conséquences »), sans toucher au code.
+
+| Point ambigu | Interprétation retenue | |
+|---|---|---|
+| « 18 octobre 2026 à minuit » | Fin de la journée du 18 : reçu **avant** le 19/10/2026 00:00:00, heure de Paris (borne exclusive). | ✔ |
+| Nom de fichier non conforme | **Avertissement** seulement, sans effet sur le statut. | ✔ |
+| Date de réception | Champ de la fiche (date d'envoi de l'e-mail). À défaut, l'horodatage du dépôt. | |
+| CV de plus de 2 pages, attestation non signée, certificat d'une autre année | A_COMPLETER | |
+| Lettre qui n'aborde pas les 3 thèmes | Avertissement (c'est une appréciation du LLM). | |
+| Certificat au mauvais nom ou d'un autre établissement | A_COMPLETER (pièce à fournir de nouveau). L'éligibilité se juge sur la fiche. | |
+| « Autre bourse d'études » | Toute bourse autre que la bourse CROUS sur critères sociaux rend le dossier NON_RECEVABLE. Le message invite à vérifier auprès d'EFELIA s'il s'agit d'une aide ponctuelle ou de mobilité. | |
+| 24 h d'IA | Sur déclaration (`heures_ia ≥ 24`, 24 incluses). Le certificat ne les mentionne pas. | |
+| Relevés de notes | Avertissement si l'année lue diffère de 2025-2026. | |
 
 ## D5 — Une information indéterminée ne change jamais le statut
 

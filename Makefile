@@ -42,7 +42,7 @@ lint: env ## ruff + mypy
 format: env ## Formate le code Python
 	$(COMPOSE) run --rm --no-deps -v "$(CURDIR)/backend:/app" api sh -c "ruff format . && ruff check --fix ."
 
-seed: ## Charge 5 dossiers de démonstration (phase 10)
+seed: ## (Re)charge les 5 dossiers de démonstration fictifs
 	$(COMPOSE) exec api python -m scripts.seed
 
 purge: ## Purge immédiate (dossiers expirés selon RETENTION_JOURS, fichiers orphelins)

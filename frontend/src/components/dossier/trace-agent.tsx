@@ -53,7 +53,7 @@ export function TraceAgent({ dossierId, ouverte }: { dossierId: string; ouverte:
               </span>
               <details className="group rounded-md px-2 py-1.5 hover:bg-muted/60 open:bg-muted/40">
                 <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 rounded text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <span className="font-mono text-xs text-muted-foreground">#{etape.ordre}</span>
+                  <span className="w-7 shrink-0 font-mono text-xs text-muted-foreground tabular-nums">#{etape.ordre}</span>
                   <span className="font-medium">{llm ? `Réflexion de l'agent (tour ${String(etape.arguments.tour ?? "")})` : etape.outil}</span>
                   {erreur && <Badge variant="danger">erreur</Badge>}
                   <span className="ml-auto text-xs text-muted-foreground tabular-nums">
