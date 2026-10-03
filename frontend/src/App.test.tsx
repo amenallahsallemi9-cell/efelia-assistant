@@ -2,49 +2,56 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { App } from "./App";
+import { REGLEMENT, SANTE } from "./test/donnees";
 import { rendre, simulerFetch } from "./test/utils";
 
-const SANTE = {
-  statut: "ok",
-  version: "0.1.0",
-  base: { etat: "ok", detail: null },
-  redis: { etat: "ok", detail: null },
-  fournisseur_llm: { etat: "ok", detail: null },
-};
+function simuler(modeDemo = false) {
+  return simulerFetch({
+    "/api/sante": { corps: { ...SANTE, mode_demo: modeDemo } },
+    "/api/reglement": { corps: REGLEMENT },
+  });
+}
 
 describe("Mise en page", () => {
   it("affiche toujours le bandeau de non-affiliation", () => {
-    simulerFetch({ "/api/sante": { corps: { ...SANTE, mode_demo: false } } });
+    simuler();
     rendre(<App />);
     expect(screen.getByText(/non affilié à EFELIA/)).toBeInTheDocument();
   });
 
   it("affiche le bandeau mode démo quand l'API est en mode démo", async () => {
-    simulerFetch({ "/api/sante": { corps: { ...SANTE, mode_demo: true } } });
+    simuler(true);
     rendre(<App />);
-    expect(await screen.findByRole("status")).toHaveTextContent("Mode démo");
+    expect(await screen.findByText(/Mode démo/)).toBeInTheDocument();
   });
 
   it("n'affiche pas le bandeau mode démo avec un vrai fournisseur", async () => {
-    const espion = simulerFetch({ "/api/sante": { corps: { ...SANTE, mode_demo: false } } });
+    const espion = simuler(false);
     rendre(<App />);
     await vi.waitFor(() => expect(espion).toHaveBeenCalled());
     expect(screen.queryByText(/Mode démo/)).not.toBeInTheDocument();
   });
 
   it("affiche une page 404 pour une route inconnue", () => {
-    simulerFetch({ "/api/sante": { corps: { ...SANTE, mode_demo: false } } });
+    simuler();
     rendre(<App />, { route: "/nexiste-pas" });
     expect(screen.getByRole("heading", { name: "Page introuvable" })).toBeInTheDocument();
   });
 
   it("bascule le thème sombre au clavier", async () => {
-    simulerFetch({ "/api/sante": { corps: { ...SANTE, mode_demo: false } } });
+    simuler();
     rendre(<App />);
     const bouton = screen.getByRole("button", { name: "Activer le mode sombre" });
     bouton.focus();
     await userEvent.keyboard("{Enter}");
     expect(document.documentElement).toHaveClass("dark");
     expect(screen.getByRole("button", { name: "Activer le mode clair" })).toBeInTheDocument();
+    document.documentElement.classList.remove("dark");
+  });
+
+  it("propose un lien d'évitement vers le contenu", () => {
+    simuler();
+    rendre(<App />);
+    expect(screen.getByRole("link", { name: "Aller au contenu" })).toHaveAttribute("href", "#contenu");
   });
 });

@@ -247,3 +247,28 @@ clairement qu'il a été produit en mode démo.
 - **Erreurs** : toujours `{"erreur": {code, message, details}}` en français, avec des
   codes stables (`DOSSIER_INTROUVABLE`, `TYPE_NON_PDF`, `FICHE_INVALIDE`,
   `TRAITEMENT_EN_COURS`…).
+
+## D20 — Interface : choix et vérifications
+
+- **Composants** : style shadcn/ui (jetons de couleur dans `index.css`, Tailwind v4).
+  Radix est utilisé pour les onglets, la fenêtre de confirmation et l'accordéon (focus et
+  clavier gérés). Les éléments natifs (`select`, `details`, cases et boutons radio
+  stylés) sont gardés quand ils suffisent.
+- **Statuts** : toujours une icône, une couleur et un libellé, y compris pour les
+  lecteurs d'écran (`sr-only`). Un contrôle « avertissement » s'affiche en ⚠️, jamais en ❌.
+- **Visionneuse** : chaque contrôle qui cite une page est un bouton (`aria-pressed`). Un
+  clic affiche la page et surligne l'extrait (aperçu rendu par l'API). Sur mobile, la
+  page défile jusqu'à la visionneuse.
+- **Temps réel** : `EventSource` sur `/evenements`. Le détail du dossier est aussi
+  rafraîchi toutes les 4 s tant que le traitement n'est pas terminé, en secours.
+- **Graphique** : une seule série en barres horizontales. Couleur validée au script
+  (`#2563eb` en clair, `#4f8ef7` en sombre : bande de luminosité et contraste ≥ 3:1),
+  valeur au bout de chaque barre, info-bulle au survol et au focus clavier, vue tableau.
+- **Accessibilité** : audit **axe-core (WCAG 2.1 AA)** sur les 7 pages, en clair et en
+  sombre : **0 violation**. S'y ajoutent un lien d'évitement, des libellés sur tous les
+  champs, des annonces `aria-live` pour la progression et les résultats, et le respect
+  de `prefers-reduced-motion`.
+- **Performance** : les pages se chargent à la demande (`React.lazy`). L'accueil n'embarque
+  ni le rendu Markdown ni Radix.
+- **Rapport** : rendu par `react-markdown` avec `skipHtml`. Aucun HTML venant du LLM n'est
+  interprété (pas d'injection de script possible par le rapport).

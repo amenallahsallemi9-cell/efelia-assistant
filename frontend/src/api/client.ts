@@ -13,7 +13,7 @@ export class ErreurApi extends Error {
   }
 }
 
-/** Appel JSON typé vers l'API (préfixe /api relayé par Vite ou nginx). */
+/** Appel typé vers l'API (préfixe /api relayé par Vite ou nginx). */
 export async function requete<T>(chemin: string, init?: RequestInit): Promise<T> {
   let reponse: Response;
   try {
@@ -24,7 +24,7 @@ export async function requete<T>(chemin: string, init?: RequestInit): Promise<T>
   } catch {
     throw new ErreurApi(0, "RESEAU", "Impossible de joindre le serveur. Vérifiez votre connexion.");
   }
-  const corps: unknown = await reponse.json().catch(() => null);
+  const corps: unknown = reponse.status === 204 ? null : await reponse.json().catch(() => null);
   if (!reponse.ok) {
     const erreur = (corps as { erreur?: { code?: string; message?: string; details?: unknown } })
       ?.erreur;
@@ -36,4 +36,13 @@ export async function requete<T>(chemin: string, init?: RequestInit): Promise<T>
     );
   }
   return corps as T;
+}
+
+/** Envoi d'un corps JSON. */
+export function envoyerJson<T>(chemin: string, corps: unknown, methode = "POST"): Promise<T> {
+  return requete<T>(chemin, {
+    method: methode,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(corps),
+  });
 }

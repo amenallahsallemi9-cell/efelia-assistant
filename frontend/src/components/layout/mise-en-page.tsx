@@ -7,9 +7,9 @@ import { BandeauAvertissement, BandeauModeDemo } from "./bandeaux";
 import { BoutonTheme } from "./bouton-theme";
 
 const LIENS = [
-  { vers: "/", libelle: "Vérification rapide" },
-  { vers: "/deposer", libelle: "Déposer un dossier" },
-  { vers: "/dossiers", libelle: "Tableau de bord" },
+  { vers: "/", libelle: "Vérification rapide", court: "Vérifier" },
+  { vers: "/deposer", libelle: "Déposer un dossier", court: "Déposer" },
+  { vers: "/dossiers", libelle: "Tableau de bord", court: "Dossiers" },
 ];
 
 export function MiseEnPage() {
@@ -24,7 +24,7 @@ export function MiseEnPage() {
       <BandeauAvertissement />
       <BandeauModeDemo />
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
+        <div className="mx-auto flex min-h-14 max-w-6xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2 sm:flex-nowrap sm:px-6 sm:py-0">
           <NavLink to="/" className="flex items-center gap-2 font-semibold tracking-tight">
             <span className="grid size-7 place-items-center rounded-md bg-primary text-primary-foreground">
               <GraduationCap aria-hidden className="size-4" />
@@ -33,7 +33,7 @@ export function MiseEnPage() {
               EFELIA <span className="font-normal text-muted-foreground">Instruction</span>
             </span>
           </NavLink>
-          <nav aria-label="Navigation principale" className="ml-auto flex items-center gap-1 overflow-x-auto">
+          <nav aria-label="Navigation principale" className="order-last -mx-1 flex w-full items-center gap-1 overflow-x-auto sm:order-none sm:mx-0 sm:ml-auto sm:w-auto">
             {LIENS.map((lien) => (
               <NavLink
                 key={lien.vers}
@@ -46,11 +46,14 @@ export function MiseEnPage() {
                   )
                 }
               >
-                {lien.libelle}
+                <span aria-hidden className="sm:hidden">{lien.court}</span>
+                <span className="max-sm:sr-only">{lien.libelle}</span>
               </NavLink>
             ))}
           </nav>
-          <BoutonTheme />
+          <div className="ml-auto sm:ml-0">
+            <BoutonTheme />
+          </div>
         </div>
       </header>
       <main id="contenu" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
