@@ -2,7 +2,7 @@
 COMPOSE := docker compose
 NODE_IMAGE := node:22-alpine
 
-.PHONY: aide env up down logs ps migrate test test-back test-front lint format seed clean
+.PHONY: aide env up down logs ps migrate test test-back test-front lint format seed purge clean
 
 aide: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -44,6 +44,9 @@ format: env ## Formate le code Python
 
 seed: ## Charge 5 dossiers de démonstration (phase 10)
 	$(COMPOSE) exec api python -m scripts.seed
+
+purge: ## Purge immédiate (dossiers expirés selon RETENTION_JOURS, fichiers orphelins)
+	$(COMPOSE) exec api python -m app.workers.purge
 
 clean: ## Arrête la stack et supprime les volumes (données effacées)
 	$(COMPOSE) down -v

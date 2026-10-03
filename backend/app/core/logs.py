@@ -15,6 +15,10 @@ CHAMPS_AUTORISES = frozenset(
 )
 
 
+#: Loggers tiers ramenés au niveau WARNING.
+LOGGERS_TUS = ("httpx", "httpcore", "uvicorn.access")
+
+
 class FormateurJson(logging.Formatter):
     """Formate chaque enregistrement en une ligne JSON, en ne gardant que les champs autorisés."""
 
@@ -42,3 +46,7 @@ def configurer_logs(niveau: str = "INFO") -> None:
     racine = logging.getLogger()
     racine.handlers = [gestionnaire]
     racine.setLevel(niveau.upper())
+    # Les clients HTTP (dont le SDK Cohere) journalisent les URL complètes : on les tait,
+    # par précaution, pour qu'aucune donnée ne puisse fuiter par une chaîne de requête.
+    for bavard in LOGGERS_TUS:
+        logging.getLogger(bavard).setLevel(logging.WARNING)

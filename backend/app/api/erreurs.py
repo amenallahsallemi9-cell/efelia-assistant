@@ -15,6 +15,7 @@ MESSAGES_HTTP = {
     404: "Ressource introuvable.",
     405: "Méthode non autorisée.",
     413: "Fichier trop volumineux.",
+    429: "Trop de requêtes : réessayez plus tard.",
     415: "Type de fichier non pris en charge.",
     422: "Données invalides.",
     500: "Erreur interne du serveur.",
@@ -25,19 +26,32 @@ class ErreurApi(Exception):
     """Erreur métier exposée au client avec un code stable et un message en français."""
 
     def __init__(
-        self, statut_http: int, code: str, message: str, details: Any | None = None
+        self,
+        statut_http: int,
+        code: str,
+        message: str,
+        details: Any | None = None,
+        en_tetes: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.statut_http = statut_http
         self.code = code
         self.message = message
         self.details = details
+        self.en_tetes = en_tetes
 
 
-def _reponse(statut: int, code: str, message: str, details: Any | None = None) -> JSONResponse:
+def _reponse(
+    statut: int,
+    code: str,
+    message: str,
+    details: Any | None = None,
+    en_tetes: dict[str, str] | None = None,
+) -> JSONResponse:
     return JSONResponse(
         status_code=statut,
         content={"erreur": {"code": code, "message": message, "details": details}},
+        headers=en_tetes,
     )
 
 
@@ -46,7 +60,7 @@ def installer_gestionnaires(app: FastAPI) -> None:
 
     @app.exception_handler(ErreurApi)
     async def _erreur_api(_: Request, exc: ErreurApi) -> JSONResponse:
-        return _reponse(exc.statut_http, exc.code, exc.message, exc.details)
+        return _reponse(exc.statut_http, exc.code, exc.message, exc.details, exc.en_tetes)
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:

@@ -24,6 +24,8 @@ class Parametres(BaseSettings):
     max_taille_mo: int = Field(default=20, gt=0)
     max_pages: int = Field(default=60, gt=0)
     retention_jours: int = Field(default=180, gt=0)
+    limite_depots_par_heure: int = Field(default=10, gt=0)
+    limite_eligibilite_par_minute: int = Field(default=30, gt=0)
 
     log_level: str = "INFO"
     cors_origines: str = "http://localhost:3000,http://localhost:5173"

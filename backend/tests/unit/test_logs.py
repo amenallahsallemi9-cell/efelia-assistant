@@ -36,3 +36,11 @@ def test_exception_reduite_a_son_type() -> None:
     sortie = FormateurJson().format(record)
     assert json.loads(sortie)["exception"] == "ValueError"
     assert "contenu sensible" not in sortie
+
+
+def test_clients_http_tus() -> None:
+    from app.core.logs import configurer_logs
+
+    configurer_logs("DEBUG")
+    for nom in ("httpx", "httpcore", "uvicorn.access"):
+        assert not logging.getLogger(nom).isEnabledFor(logging.INFO)

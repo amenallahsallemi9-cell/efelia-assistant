@@ -1,12 +1,14 @@
 """Dépendances FastAPI partagées (remplaçables dans les tests)."""
 
 import uuid
+from collections.abc import Callable
 from functools import lru_cache
-from typing import Protocol
+from typing import Annotated, Protocol
 
+from fastapi import Depends, Request
 from redis import Redis
 
-from app.core.config import get_parametres
+from app.core.config import Parametres, get_parametres
 
 ClientRedis = Redis
 
@@ -46,3 +48,34 @@ class PlanificateurRQ:
 def get_planificateur() -> Planificateur:
     """Planificateur utilisé par l'API."""
     return PlanificateurRQ()
+
+
+def limite_debit(
+    nom: str, limite: Callable[[Parametres], int], fenetre_s: int
+) -> Callable[..., None]:
+    """Dépendance FastAPI : au plus `limite` requêtes par adresse et par fenêtre."""
+
+    def _verifier(
+        requete: Request,
+        client: Annotated[ClientRedis, Depends(get_redis)],
+        parametres: Annotated[Parametres, Depends(get_parametres)],
+    ) -> None:
+        from app.api.erreurs import ErreurApi
+        from app.core.securite import adresse_client, autoriser
+
+        autorise, attente = autoriser(
+            client, f"{nom}:{adresse_client(requete)}", limite(parametres), fenetre_s
+        )
+        if not autorise:
+            raise ErreurApi(
+                429,
+                "TROP_DE_REQUETES",
+                f"Trop de requêtes : réessayez dans {attente} secondes.",
+                en_tetes={"Retry-After": str(attente)},
+            )
+
+    return _verifier
+
+
+limiter_depots = limite_debit("depot", lambda p: p.limite_depots_par_heure, 3600)
+limiter_eligibilite = limite_debit("eligibilite", lambda p: p.limite_eligibilite_par_minute, 60)

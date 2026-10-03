@@ -9,5 +9,6 @@ RUN npm run build
 # Service statique + reverse proxy vers l'API
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY securite.conf /etc/nginx/securite.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80

@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+from app.api.dependances import limiter_eligibilite
 from app.api.schemas import DemandeEligibilite, PieceReglement, ReponseEligibilite, ResumeReglement
 from app.core.reglement import get_reglement
 from app.domain.modeles import Verdict
@@ -22,7 +23,12 @@ routeur = APIRouter(tags=["règlement"])
 ReglementDep = Annotated[Reglement, Depends(get_reglement)]
 
 
-@routeur.post("/eligibilite", response_model=ReponseEligibilite, summary="Vérification rapide")
+@routeur.post(
+    "/eligibilite",
+    response_model=ReponseEligibilite,
+    summary="Vérification rapide",
+    dependencies=[Depends(limiter_eligibilite)],
+)
 def eligibilite(demande: DemandeEligibilite, reglement: ReglementDep) -> ReponseEligibilite:
     """Les 4 conditions d'éligibilité et, si une date est fournie, le respect du délai."""
     fiche = Fiche(

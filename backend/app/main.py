@@ -8,6 +8,7 @@ from app.api.erreurs import installer_gestionnaires
 from app.api.routes import dossiers, eligibilite, sante
 from app.core.config import get_parametres
 from app.core.logs import configurer_logs
+from app.core.securite import intergiciel_securite
 
 DESCRIPTION = """
 Instruction automatique de la **recevabilité** des dossiers de la Bourse Excellence
@@ -38,6 +39,7 @@ def creer_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.middleware("http")(intergiciel_securite)
     installer_gestionnaires(app)
     for routeur in (sante.routeur, eligibilite.routeur, dossiers.routeur):
         app.include_router(routeur, prefix="/api")

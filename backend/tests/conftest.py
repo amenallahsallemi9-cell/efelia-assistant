@@ -75,6 +75,9 @@ def parametres_test(tmp_path: Path) -> Parametres:
         stockage_dir=tmp_path / "dossiers",
         regles_fichier=RACINE_BACKEND.parent / "config" / "regles_2026.yaml",
         reglement_texte=RACINE_BACKEND.parent / "config" / "reglement_2026.md",
+        # Les tests déposent beaucoup de dossiers : la limitation est testée à part.
+        limite_depots_par_heure=100_000,
+        limite_eligibilite_par_minute=100_000,
     )
 
 

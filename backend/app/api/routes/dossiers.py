@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.dependances import Planificateur, get_planificateur
+from app.api.dependances import Planificateur, get_planificateur, limiter_depots
 from app.api.erreurs import ErreurApi
 from app.api.schemas import (
     DecisionSortie,
@@ -74,6 +74,7 @@ def _attendu(dossier: Dossier, reglement: Reglement) -> str:
     response_model=ReponseDepot,
     status_code=status.HTTP_202_ACCEPTED,
     summary="Déposer un dossier (PDF + fiche)",
+    dependencies=[Depends(limiter_depots)],
 )
 async def deposer(
     session: SessionDep,

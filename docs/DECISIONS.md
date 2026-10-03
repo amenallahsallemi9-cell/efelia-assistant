@@ -272,3 +272,38 @@ clairement qu'il a été produit en mode démo.
   ni le rendu Markdown ni Radix.
 - **Rapport** : rendu par `react-markdown` avec `skipHtml`. Aucun HTML venant du LLM n'est
   interprété (pas d'injection de script possible par le rapport).
+
+## D21 — Sécurité et RGPD : mesures de la phase 9
+
+- **Aucune donnée de document dans les journaux.** Un test d'intégration parcourt tout
+  le cycle (dépôt, pipeline, agent, consultation, aperçu surligné, éligibilité,
+  effacement) et vérifie que les journaux ne contiennent ni texte de document, ni nom,
+  ni e-mail. Les failles trouvées et corrigées :
+  - le paramètre `?surligner=` (un extrait de document) aurait été écrit par le journal
+    d'accès d'uvicorn et par celui de nginx. Uvicorn tourne désormais en
+    `--no-access-log`, remplacé par un journal maison sans chaîne de requête, et nginx
+    utilise un `log_format` basé sur `$uri` (sans `$args`) ;
+  - les clients HTTP (`httpx`, `httpcore`, utilisés par le SDK Cohere) journalisent les
+    URL complètes. Ils sont ramenés au niveau WARNING.
+- **Conservation limitée** : au démarrage, le worker planifie une purge quotidienne
+  (RQ). Elle efface les dossiers plus vieux que `RETENTION_JOURS` (180 par défaut) et
+  les fichiers orphelins de plus d'une heure. Chaque exécution a son propre identifiant :
+  sans cela, la purge en cours empêchait de planifier la suivante (bug corrigé, couvert
+  par un test de non-régression). Une purge immédiate se lance avec `make purge`.
+- **Limitation de débit** (Redis, fenêtre fixe, par IP) : 10 dépôts par heure et
+  30 vérifications d'éligibilité par minute, configurables. Au-delà, l'API répond 429
+  avec `Retry-After`. Si Redis est indisponible, les requêtes passent : la
+  disponibilité prime, et l'incident est journalisé.
+- **Adresse IP fiable** : nginx **remplace** `X-Forwarded-For` par l'adresse réelle, sans
+  la compléter, et uvicorn lui fait confiance. Les ports de l'API et de l'interface ne
+  sont publiés que sur `127.0.0.1`, et celui de la base ne l'est plus du tout : impossible
+  d'usurper une IP en contactant l'API directement depuis le réseau.
+- **En-têtes** : CSP stricte côté interface (`script-src 'self'`, d'où le script de thème
+  sorti de `index.html`, `frame-ancestors 'none'`, `object-src 'none'`). L'API envoie
+  `default-src 'none'`, sauf sur `/docs`. S'y ajoutent `nosniff`, `X-Frame-Options: DENY`,
+  `Referrer-Policy: no-referrer` et une `Permissions-Policy`. `style-src` garde
+  `'unsafe-inline'` pour les largeurs calculées du graphique et de la barre de
+  progression.
+- **Rappels des mesures déjà en place** : validation stricte des fichiers (D9), justificatifs
+  sensibles jamais lus (D7), aperçus sensibles pixelisés (D19), e-mail jamais transmis au
+  LLM (D17), effacement complet en un appel (D19), conteneurs exécutés sans droits root.
