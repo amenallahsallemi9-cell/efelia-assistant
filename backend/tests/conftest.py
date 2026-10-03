@@ -74,6 +74,7 @@ def parametres_test(tmp_path: Path) -> Parametres:
         cohere_api_key=None,
         stockage_dir=tmp_path / "dossiers",
         regles_fichier=RACINE_BACKEND.parent / "config" / "regles_2026.yaml",
+        reglement_texte=RACINE_BACKEND.parent / "config" / "reglement_2026.md",
     )
 
 

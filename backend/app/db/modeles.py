@@ -148,7 +148,9 @@ class Morceau(Base):
     )
     type_piece: Mapped[TypePiece | None] = mapped_column(_enum(TypePiece, "type_piece"))
     page: Mapped[int | None] = mapped_column(Integer)
+    section: Mapped[str | None] = mapped_column(String(200))
     texte: Mapped[str] = mapped_column(Text)
+    modele_embedding: Mapped[str] = mapped_column(String(120), index=True)
     embedding: Mapped[list[float]] = mapped_column(Vector(DIMENSION_EMBEDDING))
     tsv: Mapped[str] = mapped_column(
         TSVECTOR, Computed("to_tsvector('french', texte)", persisted=True)

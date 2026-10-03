@@ -55,7 +55,7 @@ def _traiter(
         ocr=lambda _: "",
         fournisseurs=construire_fournisseurs(parametres),
     )
-    assert statut is StatutPipeline.LU, dossier.message_erreur
+    assert statut is StatutPipeline.INDEXE, dossier.message_erreur
     session.refresh(dossier)
     return dossier
 

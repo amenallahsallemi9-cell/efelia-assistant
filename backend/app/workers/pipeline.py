@@ -27,6 +27,7 @@ from app.services.extraction import (
     executer_extraction,
     ocr_tesseract,
 )
+from app.services.indexation import indexer_dossier, indexer_reglement_fichier
 from app.services.lecture import executer_lecture
 
 logger = logging.getLogger(__name__)
@@ -99,11 +100,19 @@ def etape_lecture(contexte: Contexte) -> None:
     executer_lecture(contexte.session, contexte.dossier, contexte.fournisseurs.llm)
 
 
+def etape_indexation(contexte: Contexte) -> None:
+    """Embeddings du dossier (et du règlement s'il a changé)."""
+    embeddings = contexte.fournisseurs.embeddings
+    indexer_reglement_fichier(contexte.session, embeddings, contexte.parametres.reglement_texte)
+    indexer_dossier(contexte.session, contexte.dossier, embeddings)
+
+
 #: Étapes du pipeline, complétées au fil des phases (classification, lecture…).
 ETAPES: list[tuple[StatutPipeline, str, Etape]] = [
     (StatutPipeline.EXTRAIT, "extraction", etape_extraction),
     (StatutPipeline.CLASSE, "classification", etape_classification),
     (StatutPipeline.LU, "lecture", etape_lecture),
+    (StatutPipeline.INDEXE, "indexation", etape_indexation),
 ]
 
 

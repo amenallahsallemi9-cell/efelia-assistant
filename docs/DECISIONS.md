@@ -142,3 +142,43 @@ prend dans cet ordre :
 3. sans aucune marque visuelle ni mention, l'attestation est jugée non signée ;
 4. dans les cas ambigus, comme une page scannée ou une mention sans marque, le contrôle
    reste indéterminé.
+
+## D14 — pgvector plutôt qu'une base vectorielle dédiée
+
+Les embeddings sont stockés dans PostgreSQL (`vector(1024)`) avec un index HNSW en
+distance cosinus. La recherche plein texte française (`tsvector`, index GIN) se fait
+dans la même table.
+
+**Pourquoi :**
+- une seule base à opérer, sauvegarder et purger (RGPD) ;
+- la suppression d'un dossier efface ses vecteurs par `ON DELETE CASCADE` ;
+- les filtres (dossier, source, modèle) s'écrivent en SQL ordinaire ;
+- à l'échelle d'un appel à candidatures (quelques centaines de dossiers), PostgreSQL
+  suffit largement.
+
+**Filtres et index :** pgvector ≥ 0.8 permet le parcours itératif
+(`hnsw.iterative_scan = relaxed_order`), qui évite de perdre des résultats quand on
+filtre. Pour une requête très sélective (un seul dossier), Postgres choisit souvent
+l'index B-tree sur `dossier_id`, ce qui est plus rapide. L'index HNSW sert les
+recherches larges, comme celles dans le règlement.
+
+## D15 — Recherche hybride avec fusion RRF, puis reranking
+
+On récupère 20 candidats par similarité cosinus et 20 par texte intégral : la requête
+est construite en OU, avec et sans accents, à partir de mots alphanumériques seulement,
+pour qu'aucun opérateur venant de l'utilisateur n'atteigne `to_tsquery`. Les deux
+listes sont fusionnées par rang réciproque (k = 60), puis le reranker choisit les
+3 meilleurs passages.
+
+Le reranker et les embeddings reçoivent le même texte enrichi : « section — passage ».
+Si le reranker échoue, l'ordre de la fusion est conservé.
+
+**Pourquoi :** les vecteurs captent le sens, le texte intégral attrape les termes exacts
+(« ECTS », un nom propre), et la fusion par rang évite de comparer des scores
+d'échelles différentes.
+
+## D16 — Chaque morceau garde le nom du modèle qui l'a vectorisé
+
+La colonne `modele_embedding` sert à filtrer toutes les recherches. Si l'on passe du
+mode démo à Cohere, les anciens vecteurs, qui ne sont pas comparables, sont ignorés. Le
+règlement est réindexé automatiquement quand son texte ou le modèle change.

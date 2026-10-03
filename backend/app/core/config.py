@@ -28,6 +28,7 @@ class Parametres(BaseSettings):
     log_level: str = "INFO"
     cors_origines: str = "http://localhost:3000,http://localhost:5173"
     regles_fichier: Path = Path("/config/regles_2026.yaml")
+    reglement_texte: Path = Path("/config/reglement_2026.md")
 
     @field_validator("cohere_api_key", mode="before")
     @classmethod
