@@ -21,6 +21,7 @@ dependencies = [
     "cohere>=5.11",
     "pyyaml>=6.0",
     "httpx>=0.27",
+    "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]
@@ -86,3 +87,8 @@ filterwarnings = ["error::DeprecationWarning:app.*"]
 [tool.coverage.run]
 branch = true
 source = ["app"]
+
+[tool.coverage.report]
+fail_under = 85
+skip_covered = true
+show_missing = true

@@ -1,0 +1,102 @@
+# =============================================================================
+#  Règlement de la Bourse Excellence EFELIA Côte d'Azur — édition 2026
+#  Seule source de vérité pour l'application. Pour une nouvelle édition :
+#  copier ce fichier, l'adapter, et pointer REGLES_FICHIER dessus.
+# =============================================================================
+
+edition: 2026
+annee_universitaire: "2026-2027"
+
+etablissement:
+  nom: "Université Côte d'Azur"
+  # Variantes acceptées dans les documents (comparaison sans accents ni casse)
+  alias: ["universite cote d'azur", "universite cote dazur", "univ cote d'azur", "uca", "univ-cotedazur"]
+
+# -----------------------------------------------------------------------------
+# Éligibilité : une condition non remplie → NON_RECEVABLE
+# Ouvert à toutes les nationalités, sans condition d'âge.
+# -----------------------------------------------------------------------------
+eligibilite:
+  inscription_uca_requise: true
+  heures_ia_minimum: 24          # au moins 24 h d'enseignement en IA (24 incluses)
+  alternance_autorisee: false
+  # Seules ces bourses sont cumulables. Une bourse est reconnue si son libellé
+  # contient TOUS les mots-clés d'au moins un groupe (sans accents ni casse).
+  bourses_compatibles:
+    - libelle: "Bourse CROUS sur critères sociaux"
+      mots_cles:
+        - ["crous", "critere"]
+        - ["crous", "social"]
+        - ["crous", "echelon"]
+        - ["bcs"]
+
+# -----------------------------------------------------------------------------
+# Format d'envoi
+# -----------------------------------------------------------------------------
+format:
+  prefixe_nom_fichier: "BourseExcellence2026"   # attendu : BourseExcellence2026_NOM.PRENOM
+  email_envoi: "EFELIA.bourses@univ-cotedazur.fr"
+  # « 18 octobre 2026 à minuit, heure de Paris » = fin de la journée du 18.
+  # Borne EXCLUSIVE : un dossier reçu à 2026-10-19 00:00:00 (Paris) est hors délai.
+  reception_avant: "2026-10-19T00:00:00"
+  fuseau: "Europe/Paris"
+
+# -----------------------------------------------------------------------------
+# Pièces : une pièce obligatoire manquante → A_COMPLETER
+# -----------------------------------------------------------------------------
+pieces_obligatoires:
+  - type: certificat_scolarite
+    libelle: "Certificat de scolarité 2026-2027"
+  - type: cv
+    libelle: "Curriculum vitae (2 pages maximum)"
+  - type: releve_notes
+    libelle: "Relevés de notes de la dernière année d'études"
+  - type: lettre_motivation
+    libelle: "Lettre de motivation (formation, parcours, projet)"
+  - type: attestation_non_cumul
+    libelle: "Attestation sur l'honneur de non-cumul, signée"
+
+pieces_facultatives:
+  - type: lettre_recommandation
+    libelle: "Lettre(s) de recommandation"
+  - type: justificatif_social
+    libelle: "Justificatifs de critères sociaux (avis d'imposition, relevés bancaires, attestation de bourse, bulletins de salaire)"
+  - type: justificatif_handicap
+    libelle: "Justificatifs de situation de handicap (CMI, RQTH, attestation MDPH, certificats médicaux)"
+
+contraintes:
+  cv_pages_max: 2
+  lettre_themes: ["formation", "parcours", "projet"]
+  # Les relevés doivent porter sur la dernière année d'études
+  annee_releve_attendue: "2025-2026"
+
+# -----------------------------------------------------------------------------
+# Conséquence de chaque contrôle non conforme sur le statut.
+#   NON_RECEVABLE | A_COMPLETER | AVERTISSEMENT (n'influe pas sur le statut)
+# -----------------------------------------------------------------------------
+consequences:
+  eligibilite_inscription_uca: NON_RECEVABLE
+  eligibilite_heures_ia: NON_RECEVABLE
+  eligibilite_alternance: NON_RECEVABLE
+  eligibilite_autre_bourse: NON_RECEVABLE
+  format_delai: NON_RECEVABLE
+  format_nom_fichier: AVERTISSEMENT
+  piece_manquante: A_COMPLETER
+  cv_nombre_pages: A_COMPLETER
+  attestation_signature: A_COMPLETER
+  certificat_annee: A_COMPLETER
+  certificat_etablissement: A_COMPLETER
+  certificat_identite: A_COMPLETER
+  lettre_themes: AVERTISSEMENT
+  releve_annee: AVERTISSEMENT
+  attestation_bourse_declaree: AVERTISSEMENT
+
+# -----------------------------------------------------------------------------
+# Sélection : informatif, utilisé UNIQUEMENT pour les conseils, jamais pour le verdict.
+# -----------------------------------------------------------------------------
+selection:
+  criteres: ["excellence académique", "difficultés financières"]
+  laureats_max: 15
+  montant_euros: 10000
+  versement: "Deux moitiés : S1, puis S2 sous condition d'assiduité"
+  reconduction_automatique: false

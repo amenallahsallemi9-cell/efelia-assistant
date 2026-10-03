@@ -54,6 +54,7 @@ class Dossier(Base):
     prenom: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(254))
     formation: Mapped[str] = mapped_column(String(255))
+    inscrit_uca: Mapped[bool] = mapped_column(Boolean)
     heures_ia: Mapped[int] = mapped_column(Integer)
     alternance: Mapped[bool] = mapped_column(Boolean)
     autre_bourse: Mapped[bool] = mapped_column(Boolean)
