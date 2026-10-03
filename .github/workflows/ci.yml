@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Back-end (ruff, mypy, pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: efelia
+          POSTGRES_PASSWORD: efelia
+          POSTGRES_DB: efelia_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U efelia" --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://efelia:efelia@localhost:5432/efelia_test
+      TEST_DATABASE_URL: postgresql+psycopg://efelia:efelia@localhost:5432/efelia_test
+      REDIS_URL: redis://localhost:6379/0
+      LLM_PROVIDER: fake
+      COHERE_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tesseract (OCR français)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-fra
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen --extra dev
+      - name: Lint (ruff)
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Typage (mypy)
+        run: uv run mypy app
+      - name: Tests (pytest)
+        run: uv run pytest
+
+  frontend:
+    name: Front-end (tsc, vitest, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

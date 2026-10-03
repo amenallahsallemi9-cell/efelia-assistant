@@ -1,0 +1,27 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Front
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Données locales (dossiers déposés)
+data/
+
+# Divers
+.DS_Store
+.idea/
+.vscode/
