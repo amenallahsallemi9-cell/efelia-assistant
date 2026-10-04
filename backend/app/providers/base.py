@@ -114,22 +114,46 @@ class Reranker(ABC):
         """Indices des documents les plus pertinents et leur score, du meilleur au moins bon."""
 
 
-def schema_compatible(schema: dict[str, Any]) -> dict[str, Any]:
+#: Contraintes de validation refusées par Cohere dans `response_format` (erreur 400
+#: « non-supported constraint »). Elles restent vérifiées côté serveur par Pydantic.
+CONTRAINTES_VALIDATION = frozenset(
+    {
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "multipleOf",
+        "minLength",
+        "maxLength",
+        "pattern",
+        "minItems",
+        "maxItems",
+        "uniqueItems",
+    }
+)
+
+
+def schema_compatible(schema: dict[str, Any], *, contraintes: bool = True) -> dict[str, Any]:
     """Schéma JSON autonome : références `$defs` remplacées, titres et défauts retirés.
 
     Les fournisseurs n'acceptent qu'un sous-ensemble de JSON Schema ; cette forme
-    simple (sans `$ref`) est la plus largement supportée.
+    simple (sans `$ref`) est la plus largement supportée. Avec `contraintes=False`,
+    les bornes (`minimum`, `maxLength`…) sont aussi retirées : la réponse doit alors
+    être revalidée par le modèle Pydantic d'origine (c'est toujours le cas ici).
     """
+    retires = {"$defs", "title", "default"} | (set() if contraintes else CONTRAINTES_VALIDATION)
     definitions = schema.get("$defs", {})
 
-    def _resoudre(noeud: Any) -> Any:
+    def _resoudre(noeud: Any, proprietes: bool = False) -> Any:
         if isinstance(noeud, dict):
-            if "$ref" in noeud:
+            if "$ref" in noeud and not proprietes:
                 return _resoudre(definitions[noeud["$ref"].split("/")[-1]])
+            # Sous `properties`, les clés sont des noms de champs (un champ peut s'appeler
+            # « title » ou « minimum ») : on ne les filtre jamais.
             return {
-                cle: _resoudre(valeur)
+                cle: _resoudre(valeur, proprietes=cle == "properties" and not proprietes)
                 for cle, valeur in noeud.items()
-                if cle not in {"$defs", "title", "default"}
+                if proprietes or cle not in retires
             }
         if isinstance(noeud, list):
             return [_resoudre(element) for element in noeud]

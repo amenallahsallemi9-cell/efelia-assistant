@@ -139,9 +139,11 @@ def test_erreurs_renvoyees_au_llm(
 
 def test_acces_a_un_autre_dossier_refuse(contexte: ContexteAgent) -> None:
     resultat = executer_outil(contexte, appel("lire_fiche", dossier_id=str(uuid.uuid4())))
-    assert resultat == {
-        "erreur": "Accès refusé : seul le dossier en cours d'instruction est accessible."
-    }
+    # Refusé, sans aucune donnée ; l'identifiant du dossier EN COURS est rappelé pour que
+    # l'agent corrige son appel (cas d'un UUID mal recopié).
+    assert set(resultat) == {"erreur"}
+    assert resultat["erreur"].startswith("Accès refusé")
+    assert str(contexte.dossier.id) in resultat["erreur"]
 
 
 def test_exception_interne_masquee(

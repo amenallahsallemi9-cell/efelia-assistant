@@ -25,3 +25,6 @@ data/
 .DS_Store
 .idea/
 .vscode/
+
+# PDF de test générés pour essais manuels
+exemples/

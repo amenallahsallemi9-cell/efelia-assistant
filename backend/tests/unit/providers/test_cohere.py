@@ -10,6 +10,7 @@ from app.providers.cohere import (
     CohereEmbeddings,
     CohereLLM,
     CohereReranker,
+    avec_relances,
     message_vers_cohere,
     outil_vers_cohere,
 )
@@ -153,3 +154,79 @@ def test_rerank() -> None:
     assert rr.reordonner("q", ["a", "b", "c"], top_n=2) == [(2, 0.9), (0, 0.2)]
     assert client.appels[0]["model"] == "rerank-multilingual-v3.0"
     assert rr.reordonner("q", [], top_n=2) == []
+
+
+class ErreurHttp(Exception):
+    def __init__(self, status_code: int, headers: dict[str, str] | None = None) -> None:
+        super().__init__(f"HTTP {status_code}")
+        self.status_code = status_code
+        self.headers = headers or {}
+
+
+def test_relance_sur_quota_puis_succes() -> None:
+    erreurs = [ErreurHttp(429), ErreurHttp(429, {"retry-after": "7"}), ErreurHttp(503)]
+
+    def appel() -> str:
+        if erreurs:
+            raise erreurs.pop(0)
+        return "ok"
+
+    attentes: list[float] = []
+    assert avec_relances(appel, "Appel", attentes.append) == "ok"
+    assert attentes == [4.0, 7.0, 16.0]  # exponentielle, ou Retry-After s'il est fourni
+
+
+def test_pas_de_relance_sur_requete_invalide() -> None:
+    attentes: list[float] = []
+
+    def appel() -> str:
+        raise ErreurHttp(400)
+
+    with pytest.raises(ErreurFournisseur, match="HTTP 400"):
+        avec_relances(appel, "Appel", attentes.append)
+    assert attentes == []
+
+
+def test_quota_toujours_depasse() -> None:
+    attentes: list[float] = []
+
+    def appel() -> str:
+        raise ErreurHttp(429)
+
+    with pytest.raises(ErreurFournisseur, match="HTTP 429"):
+        avec_relances(appel, "Appel", attentes.append)
+    assert attentes == [4.0, 8.0, 16.0, 32.0, 60.0, 60.0]
+
+
+@pytest.mark.parametrize("fournisseur", ["chat", "embed", "rerank"])
+def test_chaque_appel_est_relance(fournisseur: str) -> None:
+    reponses: list[Any] = [ErreurHttp(429)]
+    ok = {
+        "chat": _reponse_chat("bonjour"),
+        "embed": SimpleNamespace(embeddings=SimpleNamespace(float_=[[0.1] * 1024])),
+        "rerank": SimpleNamespace(results=[SimpleNamespace(index=0, relevance_score=0.5)]),
+    }[fournisseur]
+    reponses.append(ok)
+
+    class Client:
+        def _repondre(self, **_: Any) -> Any:
+            suivant = reponses.pop(0)
+            if isinstance(suivant, Exception):
+                raise suivant
+            return suivant
+
+        chat = embed = rerank = _repondre
+
+    objet: Any = {"chat": CohereLLM, "embed": CohereEmbeddings, "rerank": CohereReranker}[
+        fournisseur
+    ]("cle")
+    objet._client = Client()
+    attentes: list[float] = []
+    objet.attendre = attentes.append
+    if fournisseur == "chat":
+        assert objet.discuter([Message("user", "x")]).texte == "bonjour"
+    elif fournisseur == "embed":
+        assert len(objet.vectoriser(["x"], "document")[0]) == 1024
+    else:
+        assert objet.reordonner("q", ["a"], 1) == [(0, 0.5)]
+    assert attentes == [4.0]

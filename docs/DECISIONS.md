@@ -317,3 +317,25 @@ clairement qu'il a été produit en mode démo.
 - **Rappels des mesures déjà en place** : validation stricte des fichiers (D9), justificatifs
   sensibles jamais lus (D7), aperçus sensibles pixelisés (D19), e-mail jamais transmis au
   LLM (D17), effacement complet en un appel (D19), conteneurs exécutés sans droits root.
+
+## D22 — Leçons du premier passage avec le vrai Cohere
+
+Le premier `make seed` avec une clé Cohere donnait les bons verdicts, mais **presque
+uniquement grâce aux secours** (heuristiques, repli déterministe). Le diagnostic, appel
+par appel, a révélé quatre problèmes. Chacun est corrigé et couvert par un test.
+
+| Constat | Correctif |
+|---|---|
+| Sortie JSON refusée (HTTP 400 « non-supported constraint: minimum ») | Les contraintes (`minimum`, `maxLength`…) sont retirées du schéma **envoyé** à Cohere, et la réponse reste revalidée par Pydantic avec ses bornes. Les noms de champs ne sont jamais filtrés. |
+| Clé d'essai limitée à 20 appels par minute (HTTP 429) | L'adaptateur relance sur les erreurs 429 et 5xx avec une attente exponentielle (4 → 60 s), ou le délai `Retry-After` s'il est fourni. Pas de relance sur 400 ou 422. |
+| Erreur ponctuelle non reproductible (HTTP 422) en milieu d'instruction | Le tour de l'agent est rejoué une fois avant le repli déterministe. |
+| Le LLM a mal recopié l'UUID du dossier (un caractère), reçu un refus d'accès et abandonné | Le refus rappelle l'identifiant du dossier en cours (ce n'est pas une fuite), le prompt demande de corriger et de réessayer, et si l'agent conclut sans décision, on lui rappelle **une fois** de terminer la procédure. |
+
+Résultat : les 5 dossiers sont instruits par l'agent Cohere jusqu'au bout, sans repli,
+avec une proposition identique au statut des règles. Le garde-fou n'a pas eu à
+intervenir.
+
+Au passage, un bug d'infrastructure est apparu : après un `make up` qui recrée le
+conteneur `api`, nginx gardait l'ancienne adresse IP et répondait 502. nginx
+réinterroge désormais le DNS de Docker toutes les 10 s (`resolver` + variable dans
+`proxy_pass`).

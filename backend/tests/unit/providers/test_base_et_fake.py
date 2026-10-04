@@ -4,7 +4,7 @@ import json
 import math
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.config import Parametres
 from app.providers import construire_fournisseurs
@@ -137,3 +137,24 @@ def test_construire_fournisseurs_cohere() -> None:
     assert f.reranker.nom_modele == "rerank-multilingual-v3.0"
     with pytest.raises(ValueError, match="COHERE_API_KEY"):
         construire_fournisseurs(Parametres(llm_provider="cohere", cohere_api_key=None))
+
+
+class AvecBornes(BaseModel):
+    title: str = Field(max_length=10)  # un champ nommé comme un mot-clé JSON Schema
+    minimum: float = Field(ge=0, le=1)
+    interne: Interne
+
+
+def test_schema_sans_contraintes_pour_cohere() -> None:
+    complet = schema_compatible(AvecBornes.model_json_schema())
+    assert complet["properties"]["title"]["maxLength"] == 10
+    assert complet["properties"]["minimum"]["maximum"] == 1
+
+    allege = schema_compatible(AvecBornes.model_json_schema(), contraintes=False)
+    proprietes = allege["properties"]
+    assert proprietes["title"] == {"type": "string"}
+    assert proprietes["minimum"] == {"type": "number"}
+    assert "$ref" not in json.dumps(allege)
+    # Les champs dont le nom ressemble à un mot-clé sont conservés
+    assert set(allege["properties"]) == {"title", "minimum", "interne"}
+    assert allege["required"] == ["title", "minimum", "interne"]

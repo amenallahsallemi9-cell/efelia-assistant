@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.db.modeles import Decision, Dossier, TraceAgent
 from app.domain.regles import Reglement
 from app.providers import Fournisseurs
-from app.providers.base import ErreurFournisseur, Message
+from app.providers.base import ErreurFournisseur, Message, Outil, ReponseLLM
 from app.services.agent.contexte import ContexteAgent, controle_vers_dict
 from app.services.agent.garde_fou import appliquer_garde_fou, retirer_predictions
 from app.services.agent.outils import alertes_injection, executer_outil, outils_pour_llm
@@ -30,6 +30,10 @@ from app.services.agent.rapport import generer_rapport
 logger = logging.getLogger(__name__)
 
 MAX_TOURS = 12
+RAPPEL_DECISION = (
+    "Tu n'as pas terminé la procédure : aucune décision n'est enregistrée. Reprends avec "
+    "les outils (dossier_id = {dossier_id}) puis appelle enregistrer_decision avant ton rapport."
+)
 MAX_CARACTERES_TRACE = 4000
 
 
@@ -91,6 +95,28 @@ def _ms(debut: float) -> int:
     return round((time.perf_counter() - debut) * 1000)
 
 
+def _discuter_avec_seconde_chance(
+    fournisseurs: Fournisseurs,
+    messages: list[Message],
+    outils: list[Outil],
+    dossier: Dossier,
+    tour: int,
+) -> ReponseLLM:
+    """Un tour de l'agent, rejoué une fois en cas d'erreur passagère du fournisseur.
+
+    Les quotas (429) sont déjà gérés par l'adaptateur ; cette seconde chance couvre les
+    erreurs ponctuelles observées en conditions réelles (ex. HTTP 422 non reproductible).
+    """
+    try:
+        return fournisseurs.llm.discuter(messages, outils)
+    except ErreurFournisseur:
+        logger.warning(
+            "Tour de l'agent rejoué après une erreur du fournisseur",
+            extra={"dossier_id": str(dossier.id), "tour": tour},
+        )
+        return fournisseurs.llm.discuter(messages, outils)
+
+
 def instruire_avec_agent(
     session: Session,
     dossier: Dossier,
@@ -108,13 +134,14 @@ def instruire_avec_agent(
         Message("user", demande_initiale(str(dossier.id))),
     ]
     texte_final: str | None = None
+    relance_faite = False
     note: str | None = None
     tours = 0
 
     for tours in range(1, max_tours + 1):
         debut = time.perf_counter()
         try:
-            reponse = fournisseurs.llm.discuter(messages, outils)
+            reponse = _discuter_avec_seconde_chance(fournisseurs, messages, outils, dossier, tours)
         except ErreurFournisseur as exc:
             logger.warning(
                 "Agent indisponible, repli déterministe",
@@ -136,6 +163,14 @@ def instruire_avec_agent(
             reponse.tokens,
         )
         if not reponse.appels_outils:
+            if contexte.proposition is None and not relance_faite:
+                # L'agent conclut sans décision : on lui rappelle une fois la procédure.
+                relance_faite = True
+                messages += [
+                    Message("assistant", reponse.texte or ""),
+                    Message("user", RAPPEL_DECISION.format(dossier_id=dossier.id)),
+                ]
+                continue
             texte_final = reponse.texte or ""
             break
         messages.append(

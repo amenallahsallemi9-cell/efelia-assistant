@@ -358,7 +358,12 @@ def executer_outil(contexte: ContexteAgent, appel: AppelOutil) -> dict[str, Any]
         )
         return {"erreur": f"Arguments invalides pour {appel.nom} — {details}"}
     if isinstance(args, ArgsDossier) and args.dossier_id != str(contexte.dossier.id):
-        return {"erreur": "Accès refusé : seul le dossier en cours d'instruction est accessible."}
+        # L'identifiant correct est rappelé : un LLM recopie parfois mal un UUID (constaté
+        # avec Cohere). Ce n'est pas une fuite : c'est le dossier qu'il instruit.
+        return {
+            "erreur": "Accès refusé : seul le dossier en cours d'instruction est accessible. "
+            f"Son identifiant est {contexte.dossier.id} : rappelle l'outil avec celui-ci."
+        }
     try:
         return definition.fonction(contexte, args)
     except ErreurOutil as exc:

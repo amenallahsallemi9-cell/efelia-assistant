@@ -244,7 +244,7 @@ Chaque décision est détaillée dans [`docs/DECISIONS.md`](docs/DECISIONS.md).
 ## Tests et qualité
 
 ```bash
-make test   # 442 tests back-end (pytest) + 35 tests front-end (Vitest), sans clé API
+make test   # 454 tests back-end (pytest) + 35 tests front-end (Vitest), sans clé API
 make lint   # ruff + mypy (mode strict sur domain/)
 ```
 
@@ -265,10 +265,12 @@ make lint   # ruff + mypy (mode strict sur domain/)
 
 ## Limites
 
-- **Cohere n'a pas été testé en conditions réelles** dans ce dépôt. L'adaptateur est testé
-  contre un client simulé ; le sous-ensemble de JSON Schema accepté en sortie structurée
-  et la qualité des rapports sont à valider avec une clé. Le mode démo (règles et
-  heuristiques) produit des rapports corrects mais génériques.
+- **Cohere a été validé sur le jeu de démonstration** : les 5 dossiers, 8 tours d'agent
+  environ chacun, propositions identiques au statut des règles, injection détectée et
+  signalée. Ce n'est pas encore une évaluation à grande échelle. Avec une **clé d'essai**
+  (20 appels par minute), `make seed` prend environ 3 min 30, grâce aux relances
+  automatiques sur quota. Le mode démo, lui, produit des rapports corrects mais
+  génériques.
 - **Pas d'authentification** : c'est un outil local, accessible seulement depuis
   `127.0.0.1`. Un déploiement réel demanderait des comptes, des rôles (candidat·e ou
   instructeur·rice) et un journal des accès.

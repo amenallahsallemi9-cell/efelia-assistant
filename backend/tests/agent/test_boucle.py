@@ -293,3 +293,82 @@ def test_hors_delai_non_recevable(
     assert d_.statut_regles is Verdict.NON_RECEVABLE
     assert "## Verdict : ❌ Non recevable" in d_.rapport
     assert "après la date limite" in d_.rapport
+
+
+def test_erreur_passagere_du_fournisseur_rejouee(
+    preparer: FabriqueDossier, session_test: Session, reglement: Reglement
+) -> None:
+    """Constaté avec Cohere : une erreur ponctuelle (HTTP 422) en plein milieu de l'instruction.
+    Le tour est rejoué une fois au lieu d'abandonner l'agent."""
+    dossier = preparer()
+    fournisseurs = fournisseurs_scenario(
+        outils(appel("lire_fiche", dossier_id=str(dossier.id))),
+        ErreurFournisseur("Appel Cohere échoué (HTTP 422)."),
+        outils(decision(dossier, "RECEVABLE")),
+        ReponseLLM(texte="### Points forts du dossier\n- Dossier complet."),
+    )
+    resultat = instruire_avec_agent(session_test, dossier, reglement, fournisseurs)
+    assert resultat.conclu is True
+    assert resultat.decision.statut_propose_llm is Verdict.RECEVABLE
+    assert "Agent LLM indisponible" not in resultat.decision.rapport
+
+
+def test_deux_erreurs_de_suite_repli_deterministe(
+    preparer: FabriqueDossier, session_test: Session, reglement: Reglement
+) -> None:
+    dossier = preparer()
+    fournisseurs = fournisseurs_scenario(ErreurFournisseur("422"), ErreurFournisseur("422"))
+    resultat = instruire_avec_agent(session_test, dossier, reglement, fournisseurs)
+    assert resultat.conclu is False
+    assert "Agent LLM indisponible" in resultat.decision.rapport
+    assert resultat.decision.statut_regles is Verdict.RECEVABLE
+
+
+def test_identifiant_mal_recopie_puis_corrige(
+    preparer: FabriqueDossier, session_test: Session, reglement: Reglement
+) -> None:
+    """Constaté avec Cohere : un caractère de l'UUID changé. L'erreur donne le bon identifiant."""
+    dossier = preparer()
+    vrai = str(dossier.id)
+    faux = vrai[:4] + ("0" if vrai[4] != "0" else "1") + vrai[5:]
+    fournisseurs = fournisseurs_scenario(
+        outils(appel("lire_fiche", dossier_id=faux)),
+        outils(appel("lire_fiche", 1, dossier_id=vrai)),
+        outils(decision(dossier, "RECEVABLE")),
+        ReponseLLM(texte="Rapport."),
+    )
+    resultat = instruire_avec_agent(session_test, dossier, reglement, fournisseurs)
+    erreur = json.loads(fournisseurs.llm.appels[1][0][-1].contenu)["erreur"]  # type: ignore[attr-defined]
+    assert vrai in erreur
+    assert resultat.conclu is True
+    assert resultat.decision.statut_propose_llm is Verdict.RECEVABLE
+
+
+def test_conclusion_sans_decision_relancee_une_fois(
+    preparer: FabriqueDossier, session_test: Session, reglement: Reglement
+) -> None:
+    dossier = preparer()
+    fournisseurs = fournisseurs_scenario(
+        ReponseLLM(texte="Je ne peux pas accéder au dossier."),
+        outils(decision(dossier, "RECEVABLE")),
+        ReponseLLM(texte="### Points forts du dossier\n- Complet."),
+    )
+    resultat = instruire_avec_agent(session_test, dossier, reglement, fournisseurs)
+    rappel = fournisseurs.llm.appels[1][0][-1]  # type: ignore[attr-defined]
+    assert rappel.role == "user"
+    assert "enregistrer_decision" in rappel.contenu
+    assert resultat.decision.statut_propose_llm is Verdict.RECEVABLE
+    assert "Complet." in resultat.decision.rapport
+
+
+def test_rappel_unique_si_l_agent_persiste(
+    preparer: FabriqueDossier, session_test: Session, reglement: Reglement
+) -> None:
+    dossier = preparer()
+    fournisseurs = fournisseurs_scenario(
+        ReponseLLM(texte="Impossible."), ReponseLLM(texte="Toujours impossible.")
+    )
+    resultat = instruire_avec_agent(session_test, dossier, reglement, fournisseurs)
+    assert len(fournisseurs.llm.appels) == 2  # type: ignore[attr-defined]
+    assert resultat.decision.statut_propose_llm is None
+    assert resultat.decision.statut_regles is Verdict.RECEVABLE

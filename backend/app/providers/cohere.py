@@ -1,7 +1,8 @@
 """Implémentation Cohere (SDK `cohere.ClientV2`)."""
 
 import logging
-from collections.abc import Sequence
+import time
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import cohere
@@ -30,8 +31,51 @@ LOT_EMBED = 96  # nombre maximal de textes par appel
 TIMEOUT_SECONDES = 60
 
 
+#: Relances sur 429 (quota) et 5xx : attente 4 s, 8 s, 16 s, 32 s, puis 60 s (≈ 3 min au total),
+#: assez pour traverser la fenêtre d'une minute d'une clé d'essai (20 appels/min).
+NB_RELANCES = 6
+ATTENTE_MAX_S = 60
+CODES_A_RELANCER = frozenset({429, 500, 502, 503, 504})
+
+
 def _client(cle: str) -> cohere.ClientV2:
     return cohere.ClientV2(api_key=cle, timeout=TIMEOUT_SECONDES)
+
+
+def _code_http(exc: Exception) -> int | None:
+    code = getattr(exc, "status_code", None)
+    return code if isinstance(code, int) else None
+
+
+def _attente(exc: Exception, tentative: int) -> float:
+    """Délai avant relance : en-tête Retry-After s'il existe, sinon attente exponentielle."""
+    en_tetes = getattr(exc, "headers", None) or {}
+    retry_after = en_tetes.get("retry-after") if isinstance(en_tetes, dict) else None
+    if retry_after and str(retry_after).isdigit():
+        return min(float(retry_after), ATTENTE_MAX_S)
+    return float(min(4 * 2**tentative, ATTENTE_MAX_S))
+
+
+def avec_relances[T](
+    appel: Callable[[], T], operation: str, attendre: Callable[[float], None] = time.sleep
+) -> T:
+    """Exécute l'appel ; relance sur quota (429) ou erreur serveur, sinon ErreurFournisseur."""
+    for tentative in range(NB_RELANCES + 1):
+        try:
+            return appel()
+        except Exception as exc:
+            code = _code_http(exc)
+            if code in CODES_A_RELANCER and tentative < NB_RELANCES:
+                delai = _attente(exc, tentative)
+                logger.warning(
+                    "Cohere : relance après attente",
+                    extra={"code": code, "duree_ms": int(delai * 1000), "etape": operation},
+                )
+                attendre(delai)
+                continue
+            details = f"HTTP {code}" if code else type(exc).__name__
+            raise ErreurFournisseur(f"{operation} Cohere échoué ({details}).") from exc
+    raise ErreurFournisseur(f"{operation} Cohere échoué (relances épuisées).")  # pragma: no cover
 
 
 def message_vers_cohere(message: Message) -> dict[str, Any]:
@@ -76,6 +120,7 @@ class CohereLLM(LLMProvider):
     def __init__(self, cle: str, modele: str = MODELE_CHAT) -> None:
         self._client = _client(cle)
         self.nom_modele = modele
+        self.attendre: Callable[[float], None] = time.sleep
 
     def discuter(
         self,
@@ -91,17 +136,20 @@ class CohereLLM(LLMProvider):
         if format_json is not None:
             options["response_format"] = {
                 "type": "json_object",
-                "json_schema": schema_compatible(format_json.schema),
+                # Cohere refuse les contraintes (minimum, maxLength…) dans response_format ;
+                # la réponse est revalidée par Pydantic avec ses bornes.
+                "json_schema": schema_compatible(format_json.schema, contraintes=False),
             }
-        try:
-            reponse = self._client.chat(
+        reponse = avec_relances(
+            lambda: self._client.chat(
                 model=self.nom_modele,
                 messages=[message_vers_cohere(m) for m in messages],  # type: ignore[misc]
                 temperature=temperature,
                 **options,
-            )
-        except Exception as exc:
-            raise ErreurFournisseur(f"Appel Cohere échoué ({type(exc).__name__}).") from exc
+            ),
+            "Appel",
+            self.attendre,
+        )
 
         message = reponse.message
         texte = "".join(
@@ -133,6 +181,7 @@ class CohereEmbeddings(EmbeddingProvider):
         self._client = _client(cle)
         self.nom_modele = modele
         self.dimension = DIMENSION_EMBED
+        self.attendre: Callable[[float], None] = time.sleep
 
     def vectoriser(self, textes: Sequence[str], usage: UsageEmbedding) -> list[list[float]]:
         """Appel `embed` par lots de 96 textes."""
@@ -140,17 +189,16 @@ class CohereEmbeddings(EmbeddingProvider):
         vecteurs: list[list[float]] = []
         for debut in range(0, len(textes), LOT_EMBED):
             lot = list(textes[debut : debut + LOT_EMBED])
-            try:
-                reponse = self._client.embed(
+
+            def _embed(lot: list[str] = lot) -> Any:
+                return self._client.embed(
                     model=self.nom_modele,
                     texts=lot,
                     input_type=type_entree,
                     embedding_types=["float"],
                 )
-            except Exception as exc:
-                raise ErreurFournisseur(
-                    f"Embeddings Cohere échoués ({type(exc).__name__})."
-                ) from exc
+
+            reponse = avec_relances(_embed, "Embeddings", self.attendre)
             flottants = reponse.embeddings.float_ or []
             if len(flottants) != len(lot):
                 raise ErreurFournisseur("Nombre d'embeddings inattendu.")
@@ -164,6 +212,7 @@ class CohereReranker(Reranker):
     def __init__(self, cle: str, modele: str = MODELE_RERANK) -> None:
         self._client = _client(cle)
         self.nom_modele = modele
+        self.attendre: Callable[[float], None] = time.sleep
 
     def reordonner(
         self, requete: str, documents: Sequence[str], top_n: int
@@ -171,10 +220,11 @@ class CohereReranker(Reranker):
         """Appel `rerank`."""
         if not documents:
             return []
-        try:
-            reponse = self._client.rerank(
+        reponse = avec_relances(
+            lambda: self._client.rerank(
                 model=self.nom_modele, query=requete, documents=list(documents), top_n=top_n
-            )
-        except Exception as exc:
-            raise ErreurFournisseur(f"Rerank Cohere échoué ({type(exc).__name__}).") from exc
+            ),
+            "Rerank",
+            self.attendre,
+        )
         return [(r.index, float(r.relevance_score)) for r in reponse.results]
